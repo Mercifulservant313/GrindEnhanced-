@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Goal Grinder</title>
+  <link rel="stylesheet" href="styles.css?v=9" />
+  <!-- Optional: XLSX for bulk .xlsx uploads (keep if you use Excel files) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+
+<body class="theme-dark">
+  <!-- Appearance controls -->
+  <aside class="sidepanel" aria-label="Appearance">
+    <div class="sidepanel-title">Appearance</div>
+    <label class="sidepanel-row">
+      <span>Theme</span>
+      <select id="themeSelect">
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+        <option value="sepia">Sepia</option>
+        <option value="forest">Forest</option>
+        <option value="rose">Rose</option>
+      </select>
+    </label>
+    <label class="sidepanel-row">
+      <span>Width</span>
+      <select id="widthSelect" title="Content width">
+        <option value="1150">Default</option>
+        <option value="1400" selected>Wide</option>
+        <option value="1600">Ultra</option>
+        <option value="9999">Full</option>
+      </select>
+    </label>
+  </aside>
+
+  <header class="topbar">
+    <h1>Goal Grinder</h1>
+    <div class="controls">
+      <input id="search" type="search" placeholder="Search videos or task…" />
+      <label class="goal">
+        Daily goal (min):
+        <input id="dailyGoal" type="number" min="10" step="5" />
+      </label>
+
+      <button id="undoBtn" title="Undo last change">Undo</button>
+
+      <button id="exportBtn" title="Export your data to JSON">Export</button>
+      <label class="import">
+        Import <input id="importFile" type="file" accept=".json" />
+      </label>
+      <button id="bulkBtn" title="Add many items from CSV/XLSX">Bulk Add</button>
+      <input id="bulkFile" type="file" accept=".csv,.xlsx,.xls" style="display:none" />
+      <button id="templateBtn" title="Download a CSV template">Template CSV</button>
+      <button id="resetBtn" class="danger" title="Reset all progress">Reset</button>
+    </div>
+  </header>
+
+  <!-- Overall progress -->
+  <div class="global-progress-wrap">
+    <div class="gp-left">
+      <span class="muted">Overall Progress</span>
+      <span id="overallCount" class="count-strong">0/0</span>
+      <span id="overallPct" class="count-muted">0%</span>
+    </div>
+    <div class="progress progress-wide">
+      <div id="overallBar" class="bar"></div>
+    </div>
+  </div>
+
+  <main class="grid">
+    <!-- Analytics -->
+    <section class="panel" id="analyticsPanel">
+      <div class="panel-header"><h2>Analytics</h2></div>
+      <div class="analytics">
+        <div class="analytics-row">
+          <div><strong>Total Video Duration:</strong> <span id="totalDuration">0:00</span></div>
+          <div><strong>Watched:</strong> <span id="watchedDuration">0:00</span></div>
+        </div>
+        <div class="donut-wrap">
+          <svg id="pieChart" viewBox="0 0 220 220" width="220" height="220" aria-label="Watched by section"></svg>
+          <div id="pieCenter" class="donut-center">0%</div>
+        </div>
+        <div id="legend" class="legend"></div>
+      </div>
+    </section>
+
+    <!-- Sections -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Sections</h2>
+        <div style="display:flex; gap:6px;">
+          <button id="collapseAllBtn" title="Collapse all sections">Collapse All</button>
+          <button id="expandAllBtn"   title="Expand all sections">Expand All</button>
+          <button id="addSectionBtn">+ Add Section</button>
+        </div>
+      </div>
+      <div id="sections"></div>
+      <div class="muted" style="padding:8px 4px 0">
+        Bulk format: Section, Title, Duration (mm:ss or hh:mm:ss), Notes
+      </div>
+    </section>
+
+    <!-- Today Queue -->
+    <aside class="panel">
+      <div class="panel-header">
+        <h2>Today Queue</h2>
+        <div class="muted" id="todayMeta"></div>
+      </div>
+
+      <div id="todayList" class="today-list"></div>
+
+      <div class="timer">
+        <div class="timer-row">
+          <span id="activeTaskLabel" class="muted">No active task</span>
+          <span id="timerDisplay" class="clock">00:00:00</span>
+        </div>
+        <div class="timer-row">
+          <button id="startTimerBtn">Start</button>
+          <button id="pauseTimerBtn">Pause</button>
+          <button id="stopTimerBtn">Stop</button>
+        </div>
+      </div>
+
+      <div class="panel-footer">
+        <button id="fillTodayBtn" title="Auto-fill queue up to your goal using uncompleted items">Auto-fill up to goal</button>
+        <button id="clearTodayBtn">Clear Today</button>
+      </div>
+
+      <div class="stats">
+        <div><strong>Studied today:</strong> <span id="studiedToday">0 min</span></div>
+        <div><strong>Streak:</strong> <span id="streakDays">0 days</span></div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Templates -->
+  <template id="sectionTmpl">
+    <details class="card" open>
+      <summary class="summary">
+        <div class="summary-left">
+          <span class="section-title"></span>
+          <span class="count muted"></span>
+        </div>
+        <div class="summary-right">
+          <div class="progress"><div class="bar"></div></div>
+          <button class="addItem">+ Add Item</button>
+          <button class="rename">Rename</button>
+          <button class="delete danger">Delete</button>
+        </div>
+      </summary>
+      <div class="items"></div>
+    </details>
+  </template>
+
+  <template id="itemTmpl">
+    <div class="item">
+      <input type="checkbox" class="done" />
+      <input type="text" class="title" />
+      <input type="text" class="duration" placeholder="mm:ss or hh:mm:ss" />
+      <input type="text" class="notes" placeholder="notes (optional)" />
+      <div class="row-buttons">
+        <button class="toToday" title="Add to Today Queue">To Today</button>
+        <button class="moveUp" title="Move up">↑</button>
+        <button class="moveDown" title="Move down">↓</button>
+        <button class="remove danger" title="Delete item">Delete</button>
+      </div>
+    </div>
+  </template>
+
+  <template id="todayItemTmpl">
+    <div class="today-item">
+      <span class="ti-title"></span>
+      <span class="ti-duration muted"></span>
+      <div class="ti-buttons">
+        <button class="start">Start</button>
+        <button class="up">↑</button>
+        <button class="down">↓</button>
+        <button class="remove danger">Remove</button>
+      </div>
+    </div>
+  </template>
+
+  <!-- Load order matters -->
+  <script src="data.js?v=9"></script>
+  <script src="js/gg-core.js?v=9"></script>
+  <script src="js/gg-analytics.js?v=9"></script>
+  <script src="js/gg-bulk.js?v=9"></script>
+  <script src="app.js?v=9"></script>
+</body>
+</html>
